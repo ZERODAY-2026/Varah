@@ -268,7 +268,7 @@ def main():
     parser.add_argument("--sf-password", help="Snowflake Password")
     parser.add_argument("--sf-warehouse", default="COMPUTE_WH", help="Snowflake Warehouse (default: COMPUTE_WH)")
     parser.add_argument("--sf-db", help="Snowflake Database Name")
-    parser.add_argument("--sf-schema", default="PUBLIC", help="Snowflake Schema Name (default: PUBLIC)")
+    parser.add_argument("--sf-schema", default=None, help="Snowflake Schema Name (default: PUBLIC)")
     parser.add_argument("--model", default="gemma-4-31b-it", help="Gemma or Open-Source model (e.g. gemma-4-31b-it, ollama/gemma4)")
     parser.add_argument("--api-key", default="", help="Google AI Studio API Key (if using cloud Gemma)")
 
@@ -283,9 +283,9 @@ def main():
         "url": args.sf_url or saved.get("sf_config", {}).get("url"),
         "user": args.sf_user or saved.get("sf_config", {}).get("user"),
         "password": args.sf_password or saved.get("sf_config", {}).get("password"),
-        "warehouse": args.sf_warehouse or saved.get("sf_config", {}).get("warehouse", "COMPUTE_WH"),
+        "warehouse": args.sf_warehouse or saved.get("sf_config", {}).get("warehouse") or "COMPUTE_WH",
         "database": args.sf_db or saved.get("sf_config", {}).get("database"),
-        "schema": args.sf_schema or saved.get("sf_config", {}).get("schema", "PUBLIC"),
+        "schema": args.sf_schema or saved.get("sf_config", {}).get("schema") or "PUBLIC",
     }
     ai_config = {
         "model": args.model if args.model != "gemma-4-31b-it" or "ai_config" not in saved else saved["ai_config"].get("model", "gemma-4-31b-it"),
