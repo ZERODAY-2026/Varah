@@ -121,3 +121,4 @@ python scripts/ask_data.py "What was life expectancy in Atlantis in 2020?"
 python scripts/ask_data.py "Drop table COUNTRIES;"
 ```
 *Expected Behavior*: Deterministic validator intercepts and blocks before hitting Snowflake: `Security Violation: Forbidden SQL keyword 'DROP' detected.`
+
