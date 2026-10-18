@@ -5,7 +5,7 @@ import { DATASETS } from '../data/datasets';
 
 const DEFAULT_CONFIG: SystemConfig = {
   backendMode: 'standalone',
-  backendUrl: 'http://localhost:8000',
+  backendUrl: 'http://localhost:8001',
   ollamaEndpoint: 'http://localhost:11434',
   gemmaModel: 'gemma3:4b',
   snowflakeAccount: 'JEEATYD-FA11867',
@@ -21,7 +21,15 @@ export function loadSystemConfig(): SystemConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+      const savedConfig = JSON.parse(saved) as Partial<SystemConfig>;
+      const backendUrl = savedConfig.backendUrl?.replace(/\/$/, '');
+      return {
+        ...DEFAULT_CONFIG,
+        ...savedConfig,
+        backendUrl: backendUrl === 'http://localhost:8000' || backendUrl === 'http://127.0.0.1:8000'
+          ? DEFAULT_CONFIG.backendUrl
+          : savedConfig.backendUrl || DEFAULT_CONFIG.backendUrl
+      };
     }
   } catch (e) {
     console.error('Error loading config:', e);
