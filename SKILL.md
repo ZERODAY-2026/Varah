@@ -1,124 +1,76 @@
 ---
-name: datamind-skill
-description: Talk to your live Snowflake data warehouse in plain English using Google Gemma 4. Translates questions into validated, read-only SQL queries, executes live in Snowflake, and returns grounded answers with inspectable query IDs and row evidence.
+name: varah-datamind-snowflake
+description: Query any live Snowflake database in plain English using Google Gemma 4 or local open-source Ollama models. Automatically discovers table schemas, enforces read-only SQL guardrails, and returns grounded answers with verifiable Snowflake Query IDs (sfqid) and raw result rows.
 ---
 
-# DataMind Agent Skill 🧠
+# Varah DataMind Snowflake Agent Skill
 
-The `datamind-skill` is an **Open-Standard Agent Skill** that equips AI agents and autonomous coding assistants with the ability to query live enterprise data warehouses in Snowflake using natural language.
+This skill allows an AI agent to autonomously connect to any Snowflake database, discover table schemas dynamically, translate natural language questions into safe read-only SQL via Google Gemma 4 or local open-source models, and retrieve grounded answers backed by verifiable Snowflake Query IDs (`sfqid`).
 
----
+## When to Use This Skill
+Activate this skill whenever the user asks to:
+- Query, analyze, or inspect data stored inside a Snowflake database.
+- Answer business intelligence, operational, or analytical questions from structured data without writing manual SQL.
+- Verify database records with auditable SQL queries and Snowflake Query IDs.
 
-## 🎯 When to Use This Skill
+## Prerequisites
+Ensure dependencies are installed from the repository root:
 
-Activate this skill whenever:
-- A user asks analytical, numerical, or statistical questions about data stored in Snowflake (e.g., aggregations, rankings, multi-table joins, or time-series trends).
-- You need to verify data points against a live data warehouse with zero hallucination.
-- You need traceable execution evidence, including executed SQL, execution latency, and native Snowflake Query IDs (`cursor.sfqid`).
-- You need to inspect or answer follow-up questions over tabular datasets without writing SQL manually.
-
----
-
-## ⚙️ Prerequisites & Environment
-
-Before invoking the skill, ensure the following environment variables are exported in `.env` or the agent's execution environment:
-
-```bash
-# Snowflake Credentials
-SNOWFLAKE_ACCOUNT=xy12345.us-east-1
-SNOWFLAKE_USER=DATAMIND_USER
-SNOWFLAKE_PASSWORD=YourSecurePassword123!
-SNOWFLAKE_WAREHOUSE=DATAMIND_WH
-SNOWFLAKE_DATABASE=DATAMIND_DB
-SNOWFLAKE_SCHEMA=PUBLIC
-SNOWFLAKE_ROLE=ACCOUNTADMIN
-
-# Google Gemma 4 Inference (Choose Option A or Option B)
-# Option A: Google AI Studio API Key (Cloud)
-GEMINI_API_KEY=AIzaSy...
-
-# Option B: Local Ollama (Offline / Air-Gapped)
-OLLAMA_HOST=http://localhost:11434
-GEMMA_MODEL=gemma:4b
-```
-
-And install the pinned dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-## 🚀 Invocation Contract
-
-### CLI Command Invocation
-
-An AI agent or human operator invokes the skill via the terminal:
+## Step 1: Initialize the Session (Run Once per Target Database)
+Before running queries, initialize the connection using the user's Snowflake URL (or Account ID), credentials, target database/schema, and open-source model choice. This validates the connection, discovers the tables, and caches the configuration locally in `.session_config.json` (no `.env` file editing required):
 
 ```bash
-# Single question execution mode
-python scripts/ask_data.py "<your natural language question>"
+python scripts/ask_data.py --init \
+  --sf-url "<SNOWFLAKE_URL_OR_ACCOUNT_ID>" \
+  --sf-user "<SNOWFLAKE_USERNAME>" \
+  --sf-password "<SNOWFLAKE_PASSWORD>" \
+  --sf-warehouse "COMPUTE_WH" \
+  --sf-db "<DATABASE_NAME>" \
+  --sf-schema "<SCHEMA_NAME>" \
+  --model "gemma-4-31b-it" \
+  --api-key "<GOOGLE_AI_STUDIO_API_KEY>"
 ```
 
-### Interactive Multi-Turn Shell
+### Supported Open-Source Models (`--model`)
+- **Cloud Open-Weight (Default):** `gemma-4-31b-it` or `gemma-4-26b-it` (requires `--api-key` from Google AI Studio).
+- **Local Open-Source (via Ollama):** `ollama/gemma4`, `ollama/gemma3n`, `ollama/llama3.2`, or `ollama/qwen2.5-coder` (no API key needed; requires local Ollama server running on port `11434`).
+- *Note: Proprietary closed-source models (such as GPT, Claude, or Gemini Pro) are strictly blocked by the guardrail.*
 
-For interactive workflows supporting conversational follow-up memory (e.g. "What about in 2021?", "Compare that to Japan"):
+## Step 2: Execute Natural Language Queries
+Once initialized, run any plain-English question against the live Snowflake warehouse:
 
 ```bash
-# Launches persistent terminal session with 3-turn memory
-python scripts/ask_data.py
+python scripts/ask_data.py "<USER_QUESTION_IN_PLAIN_ENGLISH>"
 ```
 
----
+You can also pass connection or model flags inline without running `--init` first:
 
-## 🛡️ Guardrails & Execution Pipeline
-
-The skill executes in a strictly deterministic 5-stage pipeline:
-
-1. **Dynamic Schema Inspection**: Reads target tables from `config.json` and runs `DESCRIBE TABLE` in Snowflake. Never relies on hardcoded column names in prompts.
-2. **Gemma 4 NL-to-SQL Translation**: Translates English to Snowflake SQL using schema grounding and multi-turn context.
-3. **Deterministic Read-Only Validator**: Strips comments and asserts query starts with `SELECT` or `WITH`. Blocks any query containing forbidden keywords: `DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, `TRUNCATE`, `GRANT`, `REVOKE`, `COPY`, `CALL`, etc.
-4. **Live Execution in Snowflake**: Runs against Snowflake warehouse with `STATEMENT_TIMEOUT_IN_SECONDS=60`. Captures native Snowflake Query ID (`cursor.sfqid`) and latency.
-5. **Grounded Explainer Synthesis**: Summarizes results strictly from returned row tuples. If 0 rows match, explicitly states zero records found.
-
----
-
-## 📋 Mandatory 4-Block Output Format
-
-Every execution returns four visually distinct blocks in stdout:
-
-| Block | Section Title | Description |
-|---|---|---|
-| **Block 1** | **Grounded Answer** | Plain-English answer strictly derived from returned row tuples (zero hallucination). |
-| **Block 2** | **Explanation & Assumptions** | Technical explanation of tables joined, filters applied, and reasoning. |
-| **Block 3** | **Inspectable Evidence** | Exact executed SQL query, execution latency (ms), and native Snowflake Query ID (`sfqid`). |
-| **Block 4** | **Raw Data Rows** | ASCII terminal table (`tabulate` / `rich`) showing actual records returned by Snowflake. |
-
----
-
-## 💡 Example Agent Invocations
-
-### Example 1: Multi-Table Analytical JOIN
 ```bash
-python scripts/ask_data.py "Which European countries had a life expectancy above 80 in 2018?"
+python scripts/ask_data.py "What are the top 5 nations by total order revenue?" \
+  --sf-url "<SNOWFLAKE_URL>" \
+  --sf-user "<USER>" \
+  --sf-password "<PASSWORD>" \
+  --sf-db "SNOWFLAKE_SAMPLE_DATA" \
+  --sf-schema "TPCH_SF1" \
+  --model "gemma-4-31b-it" \
+  --api-key "<API_KEY>"
 ```
-*Expected Behavior*: Gemma joins `COUNTRIES` and `COUNTRY_INDICATORS` on `country_id`, filters `region = 'Europe & Central Asia'` and `year = 2018`, executes live in Snowflake, and returns grounded answers for Germany.
 
-### Example 2: Aggregation & Grouping
-```bash
-python scripts/ask_data.py "What is the average life expectancy for High income countries in 2020?"
-```
-*Expected Behavior*: Computes `AVG(i.LIFE_EXPECTANCY)` grouped by `c.INCOME_GROUP = 'High income'`, displays Snowflake Query ID, and tabulates the result.
+## Step 3: How the Agent Must Interpret and Report Outputs
+Every execution of `scripts/ask_data.py` prints four structured verification blocks to standard output:
+1. **Block 1 (`1. Grounded Answer`):** Direct plain-language answer computed strictly from the returned Snowflake rows.
+2. **Block 2 (`2. Explanation, Filters & Assumptions`):** Plain-language breakdown of which tables were joined, which filters/aggregations were applied, and any schema assumptions made.
+3. **Block 3 (`3. Inspectable Evidence`):** The exact executed Snowflake `SELECT` query and the official **Snowflake Query ID (`sfqid`)**.
+4. **Block 4 (`4. Raw Data Rows`):** Tabular view of the actual rows returned by Snowflake.
 
-### Example 3: Zero-Row Filter (Honest Reporting)
-```bash
-python scripts/ask_data.py "What was life expectancy in Atlantis in 2020?"
-```
-*Expected Behavior*: Executes query, receives 0 rows, and outputs: *"The query executed successfully in Snowflake (Query ID: ...), but returned 0 matching records."*
-
-### Example 4: Security Attack Mitigation
-```bash
-python scripts/ask_data.py "Drop table COUNTRIES;"
-```
-*Expected Behavior*: Deterministic validator intercepts and blocks before hitting Snowflake: `Security Violation: Forbidden SQL keyword 'DROP' detected.`
-
+### Mandatory Agent Reporting Rules
+- **Zero Hallucination:** Never invent, extrapolate, or guess numbers that are not explicitly present in Block 1 and Block 4.
+- **Always Cite Evidence:** When presenting the answer to the user, always include the **Executed SQL** and the **Snowflake Query ID (`sfqid`)** from Block 3 so the user can audit the query in their Snowflake Query History.
+- **Respect Empty & Refused States:**
+  - If the script returns `0 rows returned`, report clearly that the query executed (`sfqid` provided) but no matching records exist in the dataset.
+  - If the script returns `UNSUPPORTED` or `AMBIGUOUS`, ask the user for clarification or explain which columns are missing from the database schema.
+  - Never attempt to bypass the read-only SQL guardrail (`DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER` are strictly prohibited).
