@@ -30,3 +30,6 @@ Thumbs.db
 
 .session_config.json
 .streamlit/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env*
